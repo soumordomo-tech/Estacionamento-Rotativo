@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Estacionamento Rotativo PWA</title>
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/vanilla-masker@1.1.1/build/vanilla-masker.min.js"></script>
     <style>
         /* Estilos Otimizados para UX Mobile */
         body { 
@@ -80,6 +81,8 @@
             background: #fff8e1; /* Fundo amarelo claro para indicar editável */
             border-color: #ffc107; 
             font-weight: bold;
+            text-align: center; /* Centraliza a placa */
+            letter-spacing: 2px;
         }
 
         /* Caixa de Resultado Financeiro */
@@ -129,8 +132,8 @@
     <div id="screen2" class="screen">
         <h2>Entrada de Veículo</h2>
         
-        <label for="inputPlaca">Placa do Veículo (CORRIJA SE NECESSÁRIO)</label>
-        <input type="text" id="inputPlaca" placeholder="LSN4I49">
+        <label for="inputPlaca">Placa do Veículo (CORRIJA USANDO O FORMATO)</label>
+        <input type="text" id="inputPlaca" placeholder="AAA-0A00" maxlength="8"> 
         
         <label for="inputNome">Nome do Dono</label>
         <input type="text" id="inputNome" placeholder="Ex: João Silva">
@@ -169,6 +172,10 @@
     </div>
 
     <script>
+        // --- Aplica a Máscara ao Carregar a Página ---
+        // A máscara força o formato Mercosul ou placa antiga: AAA-0A00
+        VMasker(document.getElementById("inputPlaca")).maskPattern("AAA-9A99");
+        
         // --- Variáveis Globais e Banco de Dados (LocalStorage) ---
         let dbVeiculos = JSON.parse(localStorage.getItem('estacionamentoDB')) || [];
         let veiculoAtual = null; 
@@ -180,6 +187,10 @@
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(telaId).classList.add('active');
             
+            // Certifica-se de que a placa está limpa antes de ir para a tela 2
+            if(telaId === 'screen2') {
+                VMasker(document.getElementById("inputPlaca")).maskPattern("AAA-9A99");
+            }
             if(telaId === 'screen1') iniciarCamera();
         }
 
@@ -202,7 +213,7 @@
                 });
         }
 
-        // --- FUNÇÃO CENTRAL DE OCR (Recebe o objeto a ser processado) ---
+        // --- FUNÇÃO CENTRAL DE OCR ---
         function rodarOCR(source) {
             statusTexto.innerHTML = "🔍 Processando imagem (lendo texto da placa)...";
 
@@ -215,7 +226,7 @@
                 }
             ).then(({ data: { text } }) => {
                 
-                // LIMPEZA E FILTRO INTELIGENTE (Regex)
+                // LIMPEZA E FILTRO INTELIGENTE
                 let textoLimpo = text.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
                 // Regex para placas antigas (AAA0000) ou Mercosul (AAA0B00)
                 const regexPlaca = /([A-Z]{3}[0-9][0-9A-Z][0-9]{2})|([A-Z]{3}[0-9]{4})/;
@@ -280,12 +291,11 @@
                 return;
             }
 
-            // O FileReader lê o conteúdo do arquivo
             const reader = new FileReader();
             reader.onload = function(e) {
                 const img = new Image();
                 img.onload = function() {
-                    rodarOCR(img); // Envia o objeto Image diretamente para o OCR
+                    rodarOCR(img);
                 };
                 img.src = e.target.result;
             };
@@ -298,16 +308,22 @@
         
         // --- Lógica de Check-in (TELA 2) ---
         function prepararCheckIn(placa) {
-            document.getElementById('inputPlaca').value = placa;
+            // Remove o hífen da placa lida antes de preencher o campo, para que a máscara funcione
+            let placaFormatada = placa.substring(0, 3) + "-" + placa.substring(3);
+            document.getElementById('inputPlaca').value = placaFormatada;
             document.getElementById('inputNome').value = "";
             mudarTela('screen2');
         }
 
         function salvarCheckIn() {
-            const placa = document.getElementById('inputPlaca').value.toUpperCase().trim();
+            // Remove a máscara antes de salvar no DB
+            const placa = VMasker.toPattern(document.getElementById('inputPlaca').value, "AAAAAAA").toUpperCase().trim();
             const nome = document.getElementById('inputNome').value.trim();
             
-            if(!nome || !placa) { alert("Preencha Placa e Nome!"); return; }
+            if(!nome || placa.length !== 7) { 
+                alert("Preencha Placa (corretamente) e Nome!"); 
+                return; 
+            }
 
             const novoRegistro = {
                 id: Date.now(), 
@@ -349,7 +365,6 @@
             const diferencaMs = saida - entrada;
             const diferencaHoras = diferencaMs / (1000 * 60 * 60); 
             
-            // REGRA DE NEGÓCIO: R$ 20,00 por hora NÃO FRACIONADA (Arredonda para cima, Mínimo 1h)
             let horasCobradas = Math.ceil(diferencaHoras);
             if (horasCobradas === 0 && diferencaMs > 0) horasCobradas = 1;
             if (horasCobradas === 0 && diferencaMs === 0) horasCobradas = 1; 
