@@ -1,391 +1,339 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estacionamento Rotativo PWA</title>
-    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
-    <style>
-        /* Estilos Otimizados para UX Mobile */
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: #eef2f7; 
-            text-align: center; 
-            padding: 10px; 
-            margin: 0; 
-        }
-        .screen { 
-            display: none; 
-            background: white; 
-            padding: 30px 20px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15); 
-            max-width: 420px; 
-            margin: 20px auto; 
-        }
-        .active { display: block; }
-        
-        h2 { color: #1f3659; margin-bottom: 25px; font-weight: 600; }
-        label { display: block; text-align: left; margin-top: 15px; font-weight: bold; color: #555; font-size: 14px; }
-        input { 
-            width: 90%; 
-            padding: 18px 10px; 
-            margin: 5px 0 15px 0; 
-            font-size: 20px; 
-            border: 2px solid #ddd; 
-            border-radius: 8px; 
-            box-sizing: border-box; 
-            transition: border-color 0.3s;
-        }
-        input:focus { border-color: #007bff; outline: none; }
-        
-        /* Botões Aprimorados */
-        button { 
-            width: 100%; 
-            padding: 18px; 
-            font-size: 17px; 
-            font-weight: bold;
-            color: white; 
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            margin-top: 15px; 
-            transition: background-color 0.2s, transform 0.1s;
-        }
-        button:active { transform: scale(0.99); }
-
-        .btn-primary { background-color: #007bff; }
-        .btn-success { background-color: #28aa54; } 
-        .btn-danger { background-color: #dc3545; }
-        .btn-secondary { background-color: #6c757d; } 
-        .btn-warning { background-color: #ffc107; color: #000; }
-        
-        /* Área da Câmera */
-        #video-container { 
-            position: relative; 
-            width: 100%; 
-            height: 300px; 
-            background: #000; 
-            overflow: hidden; 
-            border-radius: 10px; 
-            margin-bottom: 15px; 
-        }
-        video { width: 100%; height: 100%; object-fit: cover; }
-        canvas { display: none; }
-        
-        .loading { font-size: 15px; color: #6c757d; font-style: italic; margin-top: 5px; }
-
-        /* Destaque Campo da Placa */
-        #inputPlaca { 
-            background: #fff8e1; /* Fundo amarelo claro para indicar editável */
-            border-color: #ffc107; 
-            font-weight: bold;
-        }
-
-        /* Caixa de Resultado Financeiro */
-        .receipt-box { 
-            border: 1px dashed #007bff; 
-            padding: 25px; 
-            background: #e9f5ff; 
-            margin-top: 20px; 
-            border-radius: 10px; 
-            text-align: left; 
-        }
-        .receipt-box p { margin: 8px 0; font-size: 17px; }
-        .price-tag { 
-            font-size: 40px; 
-            color: #dc3545; 
-            font-weight: 700; 
-            margin: 20px 0; 
-            text-align: center; 
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Leitor de Placas Mercosul com OCR + Correção inteligente</title>
+  <!-- Tesseract.js (OCR) -->
+  <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1218; --card: #161a22; --text: #e8eaed; --muted: #9aa0a6; --accent: #4e79ff; --ok: #2da44e; --warn: #d29922; --err: #d73a49;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background: var(--bg); color: var(--text); }
+    header { padding: 24px; border-bottom: 1px solid #232733; }
+    h1 { margin: 0; font-size: 20px; }
+    main { max-width: 980px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { background: var(--card); border: 1px solid #232733; border-radius: 12px; padding: 16px; }
+    .row { display: flex; gap: 12px; align-items: center; }
+    .row > * { flex: 1; }
+    .label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    input[type="file"] { padding: 8px; background: #1b202b; border: 1px solid #2a3040; border-radius: 8px; color: var(--text); }
+    button { padding: 10px 14px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .preview { width: 100%; aspect-ratio: 16/9; background: #0b0e14; border: 1px dashed #2a3040; border-radius: 8px; display: grid; place-items: center; overflow: hidden; }
+    .preview img { width: 100%; height: 100%; object-fit: contain; }
+    .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
+    .status { font-size: 12px; color: var(--muted); }
+    .badge { display: inline-block; padding: 6px 8px; border-radius: 6px; font-size: 12px; }
+    .ok { background: #142a19; color: #8fe097; border: 1px solid #255f35; }
+    .warn { background: #2a1f0e; color: #ffdc92; border: 1px solid #6a4f1b; }
+    .err { background: #2a1315; color: #ffb3b8; border: 1px solid #7a252b; }
+    .list { display: grid; gap: 6px; }
+    .item { display: flex; align-items: center; justify-content: space-between; background: #11151d; border: 1px solid #232733; border-radius: 8px; padding: 8px 10px; }
+    .item .left { display: flex; gap: 10px; align-items: center; }
+    .muted { color: var(--muted); }
+    canvas { display: none; }
+    @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  </style>
 </head>
 <body>
+  <header>
+    <h1>Leitor de placas (Mercosul/Antigo) com OCR, normalização e validação</h1>
+    <div class="status">Carregue uma imagem da placa e clique em "Ler placa". O sistema corrige ambiguidades (O↔0, I↔1, S↔5, B↔8, Z↔2) e valida com regex.</div>
+  </header>
 
-    <div id="screen1" class="screen active">
-        <h2>🅿️ Estacionamento Rotativo</h2>
-        <p>Inicie o Check-in capturando a placa.</p>
-        
-        <div id="video-container">
-            <video id="video" autoplay playsinline></video>
+  <main>
+    <section class="card">
+      <div class="label">Imagem da placa</div>
+      <div class="preview" id="preview">
+        <span class="muted">Pré-visualização</span>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <input type="file" id="file" accept="image/*" />
+        <button id="btnRead" disabled>Ler placa</button>
+      </div>
+      <div class="status" id="status" style="margin-top:8px;"></div>
+      <canvas id="canvas"></canvas>
+    </section>
+
+    <section class="card">
+      <div class="label">Resultado</div>
+      <div class="list" id="results">
+        <div class="item">
+          <div class="left">
+            <span class="badge warn">Aguardando</span>
+            <span class="muted">Nenhuma leitura ainda.</span>
+          </div>
         </div>
-        <p id="ocr-status" class="loading">Iniciando câmera...</p>
-        
-        <button class="btn-primary" onclick="capturarPlaca()">📸 CAPTURAR E LER PLACA</button>
-        
-        <hr style="margin: 25px 0; border-top: 1px solid #eee;">
-        
-        <label for="fileInput" style="text-align: center; color: #1f3659; margin-top: 5px;">Ou carregue uma foto da placa:</label>
-        <input type="file" id="fileInput" accept="image/*" style="width: 100%; border: none; padding: 10px 0; margin-bottom: 10px; font-size: 16px;">
-        <button class="btn-secondary" onclick="processarFotoCarregada()">⬆️ PROCESSAR FOTO SALVA</button>
-        
-        <hr style="margin: 25px 0; border-top: 1px solid #eee;">
+      </div>
+    </section>
+  </main>
 
-        <button class="btn-success" onclick="mudarTela('screen3')">✅ CHECK-OUT (Saída)</button>
-        <button class="btn-warning" onclick="simularLeitura()">⚠️ SIMULAR LEITURA (Teste)</button>
-    </div>
+  <script>
+    // Regex para padrões brasileiros
+    // Antigo: ABC1234
+    const REGEX_ANTIGA = /^[A-Z]{3}[0-9]{4}$/;
+    // Mercosul (mais comum): ABC1D23 (3 letras, 1 número, 1 letra/numero ambíguo, 2 números)
+    // Aceita ABC0123 e ABC1A23 (variações após mudança do padrão)
+    const REGEX_MERCOSUL = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/;
 
-    <div id="screen2" class="screen">
-        <h2>Entrada de Veículo</h2>
-        
-        <label for="inputPlaca">Placa do Veículo (CORRIJA SE NECESSÁRIO)</label>
-        <input type="text" id="inputPlaca" placeholder="LSN4I49">
-        
-        <label for="inputNome">Nome do Dono</label>
-        <input type="text" id="inputNome" placeholder="Ex: João Silva">
-        
-        <button class="btn-success" onclick="salvarCheckIn()">💾 SALVAR CHECK-IN</button>
-        <button class="btn-secondary" onclick="mudarTela('screen1')">↩️ CANCELAR E VOLTAR</button>
-    </div>
+    // Mapeamento de ambiguidade caracter ↔ caracter
+    const AMBIG_MAP = {
+      'O': ['0'], '0': ['O'],
+      'I': ['1'], '1': ['I'],
+      'S': ['5'], '5': ['S'],
+      'B': ['8'], '8': ['B'],
+      'Z': ['2'], '2': ['Z']
+    };
 
-    <div id="screen3" class="screen">
-        <h2>Buscar Check-out</h2>
-        <p>Digite o nome do cliente para buscar:</p>
-        
-        <input type="text" id="buscaNome" placeholder="Nome Completo">
-        
-        <button class="btn-primary" onclick="buscarCliente()">🔎 BUSCAR VEÍCULO</button>
-        <button class="btn-secondary" onclick="mudarTela('screen1')">↩️ VOLTAR</button>
-    </div>
+    const fileInput = document.getElementById('file');
+    const btnRead = document.getElementById('btnRead');
+    const preview = document.getElementById('preview');
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const canvas = document.getElementById('canvas');
 
-    <div id="screen4" class="screen">
-        <h2>Resumo e Pagamento</h2>
-        
-        <div class="receipt-box">
-            <p><strong>Nome:</strong> <span id="resumoNome"></span></p>
-            <p><strong>Placa:</strong> <span id="resumoPlaca"></span></p>
-            <hr style="margin: 10px 0;">
-            <p>Entrada: <span id="resumoEntrada"></span></p>
-            <p>Saída: <span id="resumoSaida"></span></p>
-            <p>Tempo Total: <span id="resumoTempo"></span></p>
-            <hr style="margin: 10px 0;">
-            <p>Horas Cobradas: <span id="resumoHorasCobradas"></span></p>
-            <p>Tarifa Horária: R$ 20,00</p>
-            <div class="price-tag" id="resumoValor">R$ 0,00</div>
-        </div>
+    let currentImage = null;
 
-        <button class="btn-danger" onclick="finalizarPagamento()">💵 FINALIZAR CHECK-OUT E PAGAR</button>
-    </div>
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) {
+        btnRead.disabled = true;
+        preview.innerHTML = '<span class="muted">Pré-visualização</span>';
+        currentImage = null;
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        currentImage = img;
+        preview.innerHTML = '';
+        preview.appendChild(img);
+        btnRead.disabled = false;
+        statusEl.textContent = 'Imagem carregada. Pronto para OCR.';
+      };
+      img.src = url;
+    });
 
-    <script>
-        // --- Variáveis Globais e Banco de Dados (LocalStorage) ---
-        let dbVeiculos = JSON.parse(localStorage.getItem('estacionamentoDB')) || [];
-        let veiculoAtual = null; 
-        const VALOR_POR_HORA = 20.00; 
-        const CARACTERES_PERMITIDOS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    btnRead.addEventListener('click', async () => {
+      if (!currentImage) return;
+      btnRead.disabled = true;
+      statusEl.textContent = 'Processando imagem (pré-processamento + OCR)...';
 
-        // --- Navegação ---
-        function mudarTela(telaId) {
-            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-            document.getElementById(telaId).classList.add('active');
-            
-            if(telaId === 'screen1') iniciarCamera();
+      // Pré-processamento básico: redimensionar, converter para canvas
+      const targetW = 1280;
+      const scale = Math.min(1, targetW / currentImage.width);
+      const w = Math.round(currentImage.width * scale);
+      const h = Math.round(currentImage.height * scale);
+      canvas.width = w;
+      canvas.height = h;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(currentImage, 0, 0, w, h);
+
+      // Pequeno realce de contraste via filtro CSS-like (simples)
+      // Nota: para algo mais robusto, usar convoluções/CLAHE com WebGL ou OpenCV.js
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        // Luma simples e boost de contraste
+        const r = data[i], g = data[i+1], b = data[i+2];
+        let l = 0.2126*r + 0.7152*g + 0.0722*b;
+        // Aumenta contraste
+        l = (l - 128) * 1.2 + 128;
+        data[i] = data[i+1] = data[i+2] = Math.max(0, Math.min(255, l));
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      try {
+        const { data: ocr } = await Tesseract.recognize(canvas, 'eng', {
+          // Whitelist de caracteres comuns de placa
+          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+        });
+
+        const raw = (ocr.text || '').toUpperCase();
+        const cleaned = raw.replace(/[^A-Z0-9]/g, '');
+        statusEl.textContent = `OCR bruto: "${raw.trim()}" | Normalizado: "${cleaned}"`;
+
+        const { best, candidates, validSet } = normalizeAndValidatePlate(cleaned);
+
+        renderResults({ raw, cleaned, best, candidates, validSet });
+      } catch (err) {
+        renderError(err);
+      } finally {
+        btnRead.disabled = false;
+      }
+    });
+
+    // Normalização e validação inteligente
+    function normalizeAndValidatePlate(text) {
+      // Corta sequências longas para evitar lixo
+      // Placas possuem entre 7 e 8 chars (mais comum: 7)
+      let s = text.slice(0, 10);
+
+      // Heurística: se começar com 3 letras, manter; caso contrário, tentar achar um bloco provável
+      const probable = pickProbableBlock(s);
+
+      // Se já bate regex, ótimo:
+      if (REGEX_ANTIGA.test(probable) || REGEX_MERCOSUL.test(probable)) {
+        return {
+          best: probable,
+          candidates: [],
+          validSet: new Set([probable])
+        };
+      }
+
+      // Gerar candidatos trocando ambiguidades em todas as posições possíveis (limitado)
+      const generated = generateCandidates(probable, 200); // limitador de explosão
+      const valids = generated.filter(p => REGEX_ANTIGA.test(p) || REGEX_MERCOSUL.test(p));
+
+      // Ranking simples: preferir padrões Mercosul (ABC1D23) sobre antigo (ABC1234), e evitar misturas improváveis
+      const ranked = rankCandidates(valids);
+
+      return {
+        best: ranked[0] || null,
+        candidates: ranked.slice(1, 10),
+        validSet: new Set(valids)
+      };
+    }
+
+    function pickProbableBlock(s) {
+      // Tenta encontrar janela de 7 chars com 3 letras no início
+      for (let i = 0; i <= s.length - 7; i++) {
+        const win = s.slice(i, i + 7);
+        if (/^[A-Z]{3}[A-Z0-9]{4}$/.test(win)) return win;
+      }
+      // fallback: pega os primeiros 7 que parecem placa
+      const fallback = s.match(/[A-Z0-9]{7,8}/);
+      return fallback ? fallback[0].slice(0, 7) : s.slice(0, 7);
+    }
+
+    function generateCandidates(s, maxOut = 300) {
+      // Explora substituições ambíguas, mas com regra posicional:
+      // ABC1D23 (posições 0-2 letras, 3 número, 4 letra/numero, 5-6 números)
+      const base = s.split('');
+      const variants = new Set([s]);
+
+      // Função para tentar todos os swaps ambíguos em cada posição
+      function trySwaps(strArr, pos) {
+        const ch = strArr[pos];
+        const outs = [];
+        if (AMBIG_MAP[ch]) {
+          for (const r of AMBIG_MAP[ch]) {
+            const copy = strArr.slice();
+            copy[pos] = r;
+            outs.push(copy.join(''));
+          }
         }
+        return outs;
+      }
 
-        // --- Lógica da Câmera ---
-        const video = document.getElementById('video');
-        const statusTexto = document.getElementById('ocr-status');
-
-        function iniciarCamera() {
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
+      // Geração em largura limitada
+      let frontier = [s];
+      while (frontier.length && variants.size < maxOut) {
+        const current = frontier.shift();
+        const arr = current.split('');
+        for (let i = 0; i < arr.length; i++) {
+          const nexts = trySwaps(arr, i);
+          for (const n of nexts) {
+            if (!variants.has(n)) {
+              variants.add(n);
+              frontier.push(n);
+              if (variants.size >= maxOut) break;
             }
-
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-                .then(stream => {
-                    video.srcObject = stream;
-                    statusTexto.innerHTML = "Aponte para a placa e clique em Capturar";
-                })
-                .catch(err => {
-                    statusTexto.innerHTML = "❌ Erro: Câmera não acessível (HTTPS necessário no celular).";
-                });
+          }
+          if (variants.size >= maxOut) break;
         }
+      }
 
-        // --- FUNÇÃO CENTRAL DE OCR (Recebe o objeto a ser processado) ---
-        function rodarOCR(source) {
-            statusTexto.innerHTML = "🔍 Processando imagem (lendo texto da placa)...";
+      // Regras rápidas de coerência posicional para filtrar:
+      const filtered = [...variants].filter(p => {
+        if (p.length !== 7) return false;
+        // Antiga: 3 letras + 4 números
+        if (/^[A-Z]{3}[0-9]{4}$/.test(p)) return true;
+        // Mercosul coerente: posições 0-2 letras; 3 número; 5-6 números; 4 pode ser letra/número
+        if (/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(p)) return true;
+        return false;
+      });
 
-            Tesseract.recognize(
-                source,
-                'eng', 
-                { 
-                    tessedit_char_whitelist: CARACTERES_PERMITIDOS, 
-                    logger: m => console.log(m.status + ": " + Math.round(m.progress * 100) + "%") 
-                }
-            ).then(({ data: { text } }) => {
-                
-                // LIMPEZA E FILTRO INTELIGENTE (Regex)
-                let textoLimpo = text.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-                const regexPlaca = /([A-Z]{3}[0-9][0-9A-Z][0-9]{2})|([A-Z]{3}[0-9]{4})/;
-                const placaMatch = textoLimpo.match(regexPlaca);
-                
-                let placaFinal = "";
+      return Array.from(new Set(filtered));
+    }
 
-                if (placaMatch) {
-                    placaFinal = placaMatch[0];
-                    alert(`✅ Placa Detectada: ${placaFinal}`);
-                } else {
-                    placaFinal = textoLimpo.substring(0, 7);
-                    if(placaFinal.length >= 5) {
-                        alert(`⚠️ Leitura Incerta: ${placaFinal}. Por favor, confira!`);
-                    } else {
-                        alert("❌ Falha na leitura da placa.");
-                        statusTexto.innerHTML = "Falha na leitura. Tente novamente.";
-                        return;
-                    }
-                }
-                prepararCheckIn(placaFinal);
-            });
-        }
+    function rankCandidates(list) {
+      if (!list.length) return [];
+      // Score: mercosul +1, evitar letras onde deveriam ser números, penalizar mistura excessiva O/0, I/1, etc.
+      function score(p) {
+        let sc = 0;
+        if (REGEX_MERCOSUL.test(p)) sc += 3;
+        if (REGEX_ANTIGA.test(p)) sc += 2;
+        // Penaliza O na posição de número (3,5,6)
+        for (const pos of [3,5,6]) { if (p[pos] === 'O') sc -= 1; }
+        // Penaliza I em posição numérica
+        for (const pos of [3,5,6]) { if (p[pos] === 'I') sc -= 1; }
+        // Bônus se 0 aparece onde deve ser número
+        for (const pos of [3,5,6]) { if (p[pos] === '0') sc += 1; }
+        return sc;
+      }
+      return [...list].sort((a, b) => score(b) - score(a));
+    }
 
-        // --- Processamento da Câmera (Com Binarização) ---
-        function capturarPlaca() {
-            if (!video.srcObject) {
-                alert("A câmera não foi iniciada. Use a simulação.");
-                return;
-            }
+    function renderResults({ raw, cleaned, best, candidates, validSet }) {
+      resultsEl.innerHTML = '';
 
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // TRATAMENTO DE IMAGEM (Binarização para Alto Contraste)
-            let imageObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            let data = imageObj.data;
-            const threshold = 100;
-            
-            for (let i = 0; i < data.length; i += 4) {
-                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                const color = avg > threshold ? 255 : 0;
-                data[i] = color; data[i + 1] = color; data[i + 2] = color;
-            }
-            ctx.putImageData(imageObj, 0, 0);
+      addItem('OCR bruto', raw.trim() || '—', 'warn');
+      addItem('Normalizado', cleaned || '—', 'warn');
 
-            rodarOCR(canvas); // Envia o canvas tratado para o OCR
-        }
+      if (best) {
+        addItem('Placa validada', best, 'ok');
+      } else {
+        addItem('Placa não validada', 'Não foi possível validar automaticamente.', 'err');
+      }
 
-        // --- Processamento da Foto Carregada ---
-        function processarFotoCarregada() {
-            const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
+      const totalValid = validSet.size;
+      addItem('Válidas encontradas', `${totalValid}`, totalValid ? 'ok' : 'err');
 
-            if (!file) {
-                alert("Por favor, selecione uma foto para processar.");
-                return;
-            }
+      if (candidates && candidates.length) {
+        const list = document.createElement('div');
+        list.className = 'list';
+        const title = document.createElement('div');
+        title.className = 'label';
+        title.textContent = 'Sugestões alternativas (ordenadas por probabilidade)';
+        resultsEl.appendChild(title);
 
-            // O FileReader lê o conteúdo do arquivo
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    rodarOCR(img); // Envia o objeto Image diretamente para o OCR
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
+        candidates.slice(0, 8).forEach(c => addItem('Sugestão', c, 'warn'));
+      }
 
-        function simularLeitura() {
-            prepararCheckIn("LSN4I49");
-        }
-        
-        // --- Lógica de Check-in (TELA 2) ---
-        function prepararCheckIn(placa) {
-            document.getElementById('inputPlaca').value = placa;
-            document.getElementById('inputNome').value = "";
-            mudarTela('screen2');
-        }
+      if (best) {
+        statusEl.textContent = `Leitura concluída. Melhor candidato: ${best}`;
+      } else {
+        statusEl.textContent = 'Leitura concluída. Revise as sugestões.';
+      }
+    }
 
-        function salvarCheckIn() {
-            const placa = document.getElementById('inputPlaca').value.toUpperCase().trim();
-            const nome = document.getElementById('inputNome').value.trim();
-            
-            if(!nome || !placa) { alert("Preencha Placa e Nome!"); return; }
+    function renderError(err) {
+      resultsEl.innerHTML = '';
+      addItem('Erro', 'Falha no OCR. Tente outra imagem ou melhore o enquadramento/iluminação.', 'err');
+      statusEl.textContent = `Erro: ${String(err && err.message || err)}`;
+    }
 
-            const novoRegistro = {
-                id: Date.now(), 
-                placa: placa,
-                nome: nome,
-                entrada: new Date().toISOString(),
-                status: 'aberto'
-            };
-
-            dbVeiculos.push(novoRegistro);
-            localStorage.setItem('estacionamentoDB', JSON.stringify(dbVeiculos));
-            
-            alert(`✅ Check-in de ${nome} (${placa}) Salvo!`);
-            mudarTela('screen1');
-        }
-
-        // --- Lógica de Check-out (TELA 3 & 4) ---
-        function buscarCliente() {
-            const termo = document.getElementById('buscaNome').value.toLowerCase().trim();
-            
-            if(!termo) { alert("Digite o nome ou parte dele para buscar!"); return; }
-
-            const encontrado = dbVeiculos.find(v => 
-                v.status === 'aberto' && v.nome.toLowerCase().includes(termo)
-            );
-
-            if(encontrado) {
-                veiculoAtual = encontrado;
-                mostrarTelaPagamento(encontrado);
-            } else {
-                alert(`❌ Cliente "${termo}" não encontrado ou o check-out já foi realizado.`);
-            }
-        }
-
-        function mostrarTelaPagamento(veiculo) {
-            const entrada = new Date(veiculo.entrada);
-            const saida = new Date(); 
-            
-            const diferencaMs = saida - entrada;
-            const diferencaHoras = diferencaMs / (1000 * 60 * 60); 
-            
-            // REGRA DE NEGÓCIO: R$ 20,00 por hora NÃO FRACIONADA (Arredonda para cima, Mínimo 1h)
-            let horasCobradas = Math.ceil(diferencaHoras);
-            if (horasCobradas === 0 && diferencaMs > 0) horasCobradas = 1;
-            if (horasCobradas === 0 && diferencaMs === 0) horasCobradas = 1; 
-            
-            const totalPagar = horasCobradas * VALOR_POR_HORA;
-
-            const hrs = Math.floor(diferencaMs / 3600000);
-            const mins = Math.floor((diferencaMs % 3600000) / 60000);
-            
-            document.getElementById('resumoNome').innerText = veiculo.nome;
-            document.getElementById('resumoPlaca').innerText = veiculo.placa;
-            document.getElementById('resumoEntrada').innerText = entrada.toLocaleString('pt-BR');
-            document.getElementById('resumoSaida').innerText = saida.toLocaleString('pt-BR');
-            
-            document.getElementById('resumoTempo').innerText = `${hrs}h ${mins}m`;
-            document.getElementById('resumoHorasCobradas').innerText = `${horasCobradas} hora(s) cheia(s)`;
-            
-            document.getElementById('resumoValor').innerText = `R$ ${totalPagar.toFixed(2)}`;
-            
-            mudarTela('screen4');
-        }
-
-        function finalizarPagamento() {
-            veiculoAtual.status = 'pago';
-            veiculoAtual.saida = new Date().toISOString();
-            veiculoAtual.valorPago = document.getElementById('resumoValor').innerText;
-            
-            const index = dbVeiculos.findIndex(v => v.id === veiculoAtual.id);
-            dbVeiculos[index] = veiculoAtual;
-            localStorage.setItem('estacionamentoDB', JSON.stringify(dbVeiculos));
-            
-            alert("Pagamento registrado! Vaga liberada.");
-            mudarTela('screen1');
-        }
-        
-        iniciarCamera();
-
-    </script>
+    function addItem(label, value, tone = 'warn') {
+      const el = document.createElement('div');
+      el.className = 'item';
+      const left = document.createElement('div');
+      left.className = 'left';
+      const badge = document.createElement('span');
+      badge.className = `badge ${tone}`;
+      badge.textContent = label;
+      const val = document.createElement('span');
+      val.className = 'mono';
+      val.textContent = value;
+      left.appendChild(badge);
+      left.appendChild(val);
+      el.appendChild(left);
+      resultsEl.appendChild(el);
+    }
+  </script>
 </body>
 </html>
