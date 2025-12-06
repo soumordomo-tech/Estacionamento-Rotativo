@@ -3,108 +3,54 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Leitor de Placas Mercosul com OCR + Correção inteligente</title>
-  <!-- Tesseract.js (OCR) -->
+  <title>Leitor de Placas - Estacionamento Rotativo</title>
   <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
   <style>
-    :root {
-      --bg: #0f1218; --card: #161a22; --text: #e8eaed; --muted: #9aa0a6; --accent: #4e79ff; --ok: #2da44e; --warn: #d29922; --err: #d73a49;
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background: var(--bg); color: var(--text); }
-    header { padding: 24px; border-bottom: 1px solid #232733; }
-    h1 { margin: 0; font-size: 20px; }
-    main { max-width: 980px; margin: 24px auto; padding: 0 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .card { background: var(--card); border: 1px solid #232733; border-radius: 12px; padding: 16px; }
-    .row { display: flex; gap: 12px; align-items: center; }
-    .row > * { flex: 1; }
-    .label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
-    input[type="file"] { padding: 8px; background: #1b202b; border: 1px solid #2a3040; border-radius: 8px; color: var(--text); }
-    button { padding: 10px 14px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
-    .preview { width: 100%; aspect-ratio: 16/9; background: #0b0e14; border: 1px dashed #2a3040; border-radius: 8px; display: grid; place-items: center; overflow: hidden; }
-    .preview img { width: 100%; height: 100%; object-fit: contain; }
-    .mono { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace; }
-    .status { font-size: 12px; color: var(--muted); }
-    .badge { display: inline-block; padding: 6px 8px; border-radius: 6px; font-size: 12px; }
-    .ok { background: #142a19; color: #8fe097; border: 1px solid #255f35; }
-    .warn { background: #2a1f0e; color: #ffdc92; border: 1px solid #6a4f1b; }
-    .err { background: #2a1315; color: #ffb3b8; border: 1px solid #7a252b; }
-    .list { display: grid; gap: 6px; }
-    .item { display: flex; align-items: center; justify-content: space-between; background: #11151d; border: 1px solid #232733; border-radius: 8px; padding: 8px 10px; }
-    .item .left { display: flex; gap: 10px; align-items: center; }
-    .muted { color: var(--muted); }
-    canvas { display: none; }
-    @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+    body { font-family: Arial, sans-serif; background:#111; color:#eee; margin:0; padding:0; }
+    header { background:#222; padding:16px; text-align:center; }
+    h1 { margin:0; font-size:20px; }
+    main { max-width:900px; margin:20px auto; padding:20px; background:#1c1c1c; border-radius:8px; }
+    .preview { width:100%; aspect-ratio:16/9; background:#333; display:flex; align-items:center; justify-content:center; border-radius:8px; overflow:hidden; }
+    .preview img { width:100%; height:100%; object-fit:contain; }
+    input, button { margin-top:12px; padding:10px; border-radius:6px; border:none; }
+    input[type="file"] { background:#444; color:#eee; }
+    button { background:#4e79ff; color:#fff; cursor:pointer; }
+    button:disabled { opacity:0.6; cursor:not-allowed; }
+    .result { margin-top:20px; padding:12px; background:#222; border-radius:6px; }
+    .ok { color:#4caf50; }
+    .err { color:#f44336; }
+    .warn { color:#ff9800; }
+    canvas { display:none; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Leitor de placas (Mercosul/Antigo) com OCR, normalização e validação</h1>
-    <div class="status">Carregue uma imagem da placa e clique em "Ler placa". O sistema corrige ambiguidades (O↔0, I↔1, S↔5, B↔8, Z↔2) e valida com regex.</div>
+    <h1>📷 Leitor de Placas (OCR + Correção)</h1>
+    <p>Carregue uma foto da placa e clique em "Ler placa".</p>
   </header>
 
   <main>
-    <section class="card">
-      <div class="label">Imagem da placa</div>
-      <div class="preview" id="preview">
-        <span class="muted">Pré-visualização</span>
-      </div>
-      <div class="row" style="margin-top:12px;">
-        <input type="file" id="file" accept="image/*" />
-        <button id="btnRead" disabled>Ler placa</button>
-      </div>
-      <div class="status" id="status" style="margin-top:8px;"></div>
-      <canvas id="canvas"></canvas>
-    </section>
-
-    <section class="card">
-      <div class="label">Resultado</div>
-      <div class="list" id="results">
-        <div class="item">
-          <div class="left">
-            <span class="badge warn">Aguardando</span>
-            <span class="muted">Nenhuma leitura ainda.</span>
-          </div>
-        </div>
-      </div>
-    </section>
+    <div class="preview" id="preview"><span>Pré-visualização</span></div>
+    <input type="file" id="file" accept="image/*" />
+    <button id="btnRead" disabled>Ler placa</button>
+    <div class="result" id="result">⏳ Aguardando leitura...</div>
+    <canvas id="canvas"></canvas>
   </main>
 
   <script>
-    // Regex para padrões brasileiros
-    // Antigo: ABC1234
     const REGEX_ANTIGA = /^[A-Z]{3}[0-9]{4}$/;
-    // Mercosul (mais comum): ABC1D23 (3 letras, 1 número, 1 letra/numero ambíguo, 2 números)
-    // Aceita ABC0123 e ABC1A23 (variações após mudança do padrão)
     const REGEX_MERCOSUL = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/;
-
-    // Mapeamento de ambiguidade caracter ↔ caracter
-    const AMBIG_MAP = {
-      'O': ['0'], '0': ['O'],
-      'I': ['1'], '1': ['I'],
-      'S': ['5'], '5': ['S'],
-      'B': ['8'], '8': ['B'],
-      'Z': ['2'], '2': ['Z']
-    };
 
     const fileInput = document.getElementById('file');
     const btnRead = document.getElementById('btnRead');
     const preview = document.getElementById('preview');
-    const statusEl = document.getElementById('status');
-    const resultsEl = document.getElementById('results');
+    const resultEl = document.getElementById('result');
     const canvas = document.getElementById('canvas');
-
     let currentImage = null;
 
-    fileInput.addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      if (!file) {
-        btnRead.disabled = true;
-        preview.innerHTML = '<span class="muted">Pré-visualização</span>';
-        currentImage = null;
-        return;
-      }
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
       const url = URL.createObjectURL(file);
       const img = new Image();
       img.onload = () => {
@@ -112,7 +58,7 @@
         preview.innerHTML = '';
         preview.appendChild(img);
         btnRead.disabled = false;
-        statusEl.textContent = 'Imagem carregada. Pronto para OCR.';
+        resultEl.textContent = "✅ Imagem carregada. Clique em 'Ler placa'.";
       };
       img.src = url;
     });
@@ -120,220 +66,40 @@
     btnRead.addEventListener('click', async () => {
       if (!currentImage) return;
       btnRead.disabled = true;
-      statusEl.textContent = 'Processando imagem (pré-processamento + OCR)...';
+      resultEl.textContent = "🔍 Processando imagem...";
 
-      // Pré-processamento básico: redimensionar, converter para canvas
-      const targetW = 1280;
-      const scale = Math.min(1, targetW / currentImage.width);
-      const w = Math.round(currentImage.width * scale);
-      const h = Math.round(currentImage.height * scale);
-      canvas.width = w;
-      canvas.height = h;
-
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(currentImage, 0, 0, w, h);
-
-      // Pequeno realce de contraste via filtro CSS-like (simples)
-      // Nota: para algo mais robusto, usar convoluções/CLAHE com WebGL ou OpenCV.js
-      const imgData = ctx.getImageData(0, 0, w, h);
-      const data = imgData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        // Luma simples e boost de contraste
-        const r = data[i], g = data[i+1], b = data[i+2];
-        let l = 0.2126*r + 0.7152*g + 0.0722*b;
-        // Aumenta contraste
-        l = (l - 128) * 1.2 + 128;
-        data[i] = data[i+1] = data[i+2] = Math.max(0, Math.min(255, l));
-      }
-      ctx.putImageData(imgData, 0, 0);
-
+      const cvs = preprocessToCanvas(currentImage);
       try {
-        const { data: ocr } = await Tesseract.recognize(canvas, 'eng', {
-          // Whitelist de caracteres comuns de placa
-          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+        const { data: ocr } = await Tesseract.recognize(cvs, 'eng', {
+          tessedit_pageseg_mode: '7',
+          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
         });
 
         const raw = (ocr.text || '').toUpperCase();
         const cleaned = raw.replace(/[^A-Z0-9]/g, '');
-        statusEl.textContent = `OCR bruto: "${raw.trim()}" | Normalizado: "${cleaned}"`;
+        const { best, candidates } = normalizeAndValidate(cleaned);
 
-        const { best, candidates, validSet } = normalizeAndValidatePlate(cleaned);
-
-        renderResults({ raw, cleaned, best, candidates, validSet });
+        if (best) {
+          resultEl.innerHTML = `✅ Placa detectada: <b class="ok">${best}</b>`;
+        } else {
+          resultEl.innerHTML = `❌ Falha na leitura.<br>OCR bruto: "${raw.trim()}"<br>Sugestões: ${candidates.join(', ')}`;
+        }
       } catch (err) {
-        renderError(err);
+        resultEl.innerHTML = `❌ Erro no OCR: ${err.message}`;
       } finally {
         btnRead.disabled = false;
       }
     });
 
-    // Normalização e validação inteligente
-    function normalizeAndValidatePlate(text) {
-      // Corta sequências longas para evitar lixo
-      // Placas possuem entre 7 e 8 chars (mais comum: 7)
-      let s = text.slice(0, 10);
-
-      // Heurística: se começar com 3 letras, manter; caso contrário, tentar achar um bloco provável
-      const probable = pickProbableBlock(s);
-
-      // Se já bate regex, ótimo:
-      if (REGEX_ANTIGA.test(probable) || REGEX_MERCOSUL.test(probable)) {
-        return {
-          best: probable,
-          candidates: [],
-          validSet: new Set([probable])
-        };
-      }
-
-      // Gerar candidatos trocando ambiguidades em todas as posições possíveis (limitado)
-      const generated = generateCandidates(probable, 200); // limitador de explosão
-      const valids = generated.filter(p => REGEX_ANTIGA.test(p) || REGEX_MERCOSUL.test(p));
-
-      // Ranking simples: preferir padrões Mercosul (ABC1D23) sobre antigo (ABC1234), e evitar misturas improváveis
-      const ranked = rankCandidates(valids);
-
-      return {
-        best: ranked[0] || null,
-        candidates: ranked.slice(1, 10),
-        validSet: new Set(valids)
-      };
-    }
-
-    function pickProbableBlock(s) {
-      // Tenta encontrar janela de 7 chars com 3 letras no início
-      for (let i = 0; i <= s.length - 7; i++) {
-        const win = s.slice(i, i + 7);
-        if (/^[A-Z]{3}[A-Z0-9]{4}$/.test(win)) return win;
-      }
-      // fallback: pega os primeiros 7 que parecem placa
-      const fallback = s.match(/[A-Z0-9]{7,8}/);
-      return fallback ? fallback[0].slice(0, 7) : s.slice(0, 7);
-    }
-
-    function generateCandidates(s, maxOut = 300) {
-      // Explora substituições ambíguas, mas com regra posicional:
-      // ABC1D23 (posições 0-2 letras, 3 número, 4 letra/numero, 5-6 números)
-      const base = s.split('');
-      const variants = new Set([s]);
-
-      // Função para tentar todos os swaps ambíguos em cada posição
-      function trySwaps(strArr, pos) {
-        const ch = strArr[pos];
-        const outs = [];
-        if (AMBIG_MAP[ch]) {
-          for (const r of AMBIG_MAP[ch]) {
-            const copy = strArr.slice();
-            copy[pos] = r;
-            outs.push(copy.join(''));
-          }
-        }
-        return outs;
-      }
-
-      // Geração em largura limitada
-      let frontier = [s];
-      while (frontier.length && variants.size < maxOut) {
-        const current = frontier.shift();
-        const arr = current.split('');
-        for (let i = 0; i < arr.length; i++) {
-          const nexts = trySwaps(arr, i);
-          for (const n of nexts) {
-            if (!variants.has(n)) {
-              variants.add(n);
-              frontier.push(n);
-              if (variants.size >= maxOut) break;
-            }
-          }
-          if (variants.size >= maxOut) break;
-        }
-      }
-
-      // Regras rápidas de coerência posicional para filtrar:
-      const filtered = [...variants].filter(p => {
-        if (p.length !== 7) return false;
-        // Antiga: 3 letras + 4 números
-        if (/^[A-Z]{3}[0-9]{4}$/.test(p)) return true;
-        // Mercosul coerente: posições 0-2 letras; 3 número; 5-6 números; 4 pode ser letra/número
-        if (/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(p)) return true;
-        return false;
-      });
-
-      return Array.from(new Set(filtered));
-    }
-
-    function rankCandidates(list) {
-      if (!list.length) return [];
-      // Score: mercosul +1, evitar letras onde deveriam ser números, penalizar mistura excessiva O/0, I/1, etc.
-      function score(p) {
-        let sc = 0;
-        if (REGEX_MERCOSUL.test(p)) sc += 3;
-        if (REGEX_ANTIGA.test(p)) sc += 2;
-        // Penaliza O na posição de número (3,5,6)
-        for (const pos of [3,5,6]) { if (p[pos] === 'O') sc -= 1; }
-        // Penaliza I em posição numérica
-        for (const pos of [3,5,6]) { if (p[pos] === 'I') sc -= 1; }
-        // Bônus se 0 aparece onde deve ser número
-        for (const pos of [3,5,6]) { if (p[pos] === '0') sc += 1; }
-        return sc;
-      }
-      return [...list].sort((a, b) => score(b) - score(a));
-    }
-
-    function renderResults({ raw, cleaned, best, candidates, validSet }) {
-      resultsEl.innerHTML = '';
-
-      addItem('OCR bruto', raw.trim() || '—', 'warn');
-      addItem('Normalizado', cleaned || '—', 'warn');
-
-      if (best) {
-        addItem('Placa validada', best, 'ok');
-      } else {
-        addItem('Placa não validada', 'Não foi possível validar automaticamente.', 'err');
-      }
-
-      const totalValid = validSet.size;
-      addItem('Válidas encontradas', `${totalValid}`, totalValid ? 'ok' : 'err');
-
-      if (candidates && candidates.length) {
-        const list = document.createElement('div');
-        list.className = 'list';
-        const title = document.createElement('div');
-        title.className = 'label';
-        title.textContent = 'Sugestões alternativas (ordenadas por probabilidade)';
-        resultsEl.appendChild(title);
-
-        candidates.slice(0, 8).forEach(c => addItem('Sugestão', c, 'warn'));
-      }
-
-      if (best) {
-        statusEl.textContent = `Leitura concluída. Melhor candidato: ${best}`;
-      } else {
-        statusEl.textContent = 'Leitura concluída. Revise as sugestões.';
-      }
-    }
-
-    function renderError(err) {
-      resultsEl.innerHTML = '';
-      addItem('Erro', 'Falha no OCR. Tente outra imagem ou melhore o enquadramento/iluminação.', 'err');
-      statusEl.textContent = `Erro: ${String(err && err.message || err)}`;
-    }
-
-    function addItem(label, value, tone = 'warn') {
-      const el = document.createElement('div');
-      el.className = 'item';
-      const left = document.createElement('div');
-      left.className = 'left';
-      const badge = document.createElement('span');
-      badge.className = `badge ${tone}`;
-      badge.textContent = label;
-      const val = document.createElement('span');
-      val.className = 'mono';
-      val.textContent = value;
-      left.appendChild(badge);
-      left.appendChild(val);
-      el.appendChild(left);
-      resultsEl.appendChild(el);
-    }
-  </script>
-</body>
-</html>
+    function preprocessToCanvas(img) {
+      const MAX_W = 1600;
+      const scale = Math.min(1, MAX_W / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const l = 0.2126*d[i] + 0.7152*d[i+1] + 0
