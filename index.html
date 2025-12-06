@@ -1,105 +1,392 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Leitor de Placas - Estacionamento Rotativo</title>
-  <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; background:#111; color:#eee; margin:0; padding:0; }
-    header { background:#222; padding:16px; text-align:center; }
-    h1 { margin:0; font-size:20px; }
-    main { max-width:900px; margin:20px auto; padding:20px; background:#1c1c1c; border-radius:8px; }
-    .preview { width:100%; aspect-ratio:16/9; background:#333; display:flex; align-items:center; justify-content:center; border-radius:8px; overflow:hidden; }
-    .preview img { width:100%; height:100%; object-fit:contain; }
-    input, button { margin-top:12px; padding:10px; border-radius:6px; border:none; }
-    input[type="file"] { background:#444; color:#eee; }
-    button { background:#4e79ff; color:#fff; cursor:pointer; }
-    button:disabled { opacity:0.6; cursor:not-allowed; }
-    .result { margin-top:20px; padding:12px; background:#222; border-radius:6px; }
-    .ok { color:#4caf50; }
-    .err { color:#f44336; }
-    .warn { color:#ff9800; }
-    canvas { display:none; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estacionamento Rotativo PWA</title>
+    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
+    <style>
+        /* Estilos Otimizados para UX Mobile */
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #eef2f7; 
+            text-align: center; 
+            padding: 10px; 
+            margin: 0; 
+        }
+        .screen { 
+            display: none; 
+            background: white; 
+            padding: 30px 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); 
+            max-width: 420px; 
+            margin: 20px auto; 
+        }
+        .active { display: block; }
+        
+        h2 { color: #1f3659; margin-bottom: 25px; font-weight: 600; }
+        label { display: block; text-align: left; margin-top: 15px; font-weight: bold; color: #555; font-size: 14px; }
+        input { 
+            width: 90%; 
+            padding: 18px 10px; 
+            margin: 5px 0 15px 0; 
+            font-size: 20px; 
+            border: 2px solid #ddd; 
+            border-radius: 8px; 
+            box-sizing: border-box; 
+            transition: border-color 0.3s;
+        }
+        input:focus { border-color: #007bff; outline: none; }
+        
+        /* Botões Aprimorados */
+        button { 
+            width: 100%; 
+            padding: 18px; 
+            font-size: 17px; 
+            font-weight: bold;
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            margin-top: 15px; 
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        button:active { transform: scale(0.99); }
+
+        .btn-primary { background-color: #007bff; }
+        .btn-success { background-color: #28aa54; } 
+        .btn-danger { background-color: #dc3545; }
+        .btn-secondary { background-color: #6c757d; } 
+        .btn-warning { background-color: #ffc107; color: #000; }
+        
+        /* Área da Câmera */
+        #video-container { 
+            position: relative; 
+            width: 100%; 
+            height: 300px; 
+            background: #000; 
+            overflow: hidden; 
+            border-radius: 10px; 
+            margin-bottom: 15px; 
+        }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        canvas { display: none; }
+        
+        .loading { font-size: 15px; color: #6c757d; font-style: italic; margin-top: 5px; }
+
+        /* Destaque Campo da Placa */
+        #inputPlaca { 
+            background: #fff8e1; /* Fundo amarelo claro para indicar editável */
+            border-color: #ffc107; 
+            font-weight: bold;
+        }
+
+        /* Caixa de Resultado Financeiro */
+        .receipt-box { 
+            border: 1px dashed #007bff; 
+            padding: 25px; 
+            background: #e9f5ff; 
+            margin-top: 20px; 
+            border-radius: 10px; 
+            text-align: left; 
+        }
+        .receipt-box p { margin: 8px 0; font-size: 17px; }
+        .price-tag { 
+            font-size: 40px; 
+            color: #dc3545; 
+            font-weight: 700; 
+            margin: 20px 0; 
+            text-align: center; 
+        }
+    </style>
 </head>
 <body>
-  <header>
-    <h1>📷 Leitor de Placas (OCR + Correção)</h1>
-    <p>Carregue uma foto da placa e clique em "Ler placa".</p>
-  </header>
 
-  <main>
-    <div class="preview" id="preview"><span>Pré-visualização</span></div>
-    <input type="file" id="file" accept="image/*" />
-    <button id="btnRead" disabled>Ler placa</button>
-    <div class="result" id="result">⏳ Aguardando leitura...</div>
-    <canvas id="canvas"></canvas>
-  </main>
+    <div id="screen1" class="screen active">
+        <h2>🅿️ Estacionamento Rotativo</h2>
+        <p>Inicie o Check-in capturando a placa.</p>
+        
+        <div id="video-container">
+            <video id="video" autoplay playsinline></video>
+        </div>
+        <p id="ocr-status" class="loading">Iniciando câmera...</p>
+        
+        <button class="btn-primary" onclick="capturarPlaca()">📸 CAPTURAR E LER PLACA</button>
+        
+        <hr style="margin: 25px 0; border-top: 1px solid #eee;">
+        
+        <label for="fileInput" style="text-align: center; color: #1f3659; margin-top: 5px;">Ou carregue uma foto da placa:</label>
+        <input type="file" id="fileInput" accept="image/*" style="width: 100%; border: none; padding: 10px 0; margin-bottom: 10px; font-size: 16px;">
+        <button class="btn-secondary" onclick="processarFotoCarregada()">⬆️ PROCESSAR FOTO SALVA</button>
+        
+        <hr style="margin: 25px 0; border-top: 1px solid #eee;">
 
-  <script>
-    const REGEX_ANTIGA = /^[A-Z]{3}[0-9]{4}$/;
-    const REGEX_MERCOSUL = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/;
+        <button class="btn-success" onclick="mudarTela('screen3')">✅ CHECK-OUT (Saída)</button>
+        <button class="btn-warning" onclick="simularLeitura()">⚠️ SIMULAR LEITURA (Teste)</button>
+    </div>
 
-    const fileInput = document.getElementById('file');
-    const btnRead = document.getElementById('btnRead');
-    const preview = document.getElementById('preview');
-    const resultEl = document.getElementById('result');
-    const canvas = document.getElementById('canvas');
-    let currentImage = null;
+    <div id="screen2" class="screen">
+        <h2>Entrada de Veículo</h2>
+        
+        <label for="inputPlaca">Placa do Veículo (CORRIJA SE NECESSÁRIO)</label>
+        <input type="text" id="inputPlaca" placeholder="LSN4I49">
+        
+        <label for="inputNome">Nome do Dono</label>
+        <input type="text" id="inputNome" placeholder="Ex: João Silva">
+        
+        <button class="btn-success" onclick="salvarCheckIn()">💾 SALVAR CHECK-IN</button>
+        <button class="btn-secondary" onclick="mudarTela('screen1')">↩️ CANCELAR E VOLTAR</button>
+    </div>
 
-    fileInput.addEventListener('change', e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        currentImage = img;
-        preview.innerHTML = '';
-        preview.appendChild(img);
-        btnRead.disabled = false;
-        resultEl.textContent = "✅ Imagem carregada. Clique em 'Ler placa'.";
-      };
-      img.src = url;
-    });
+    <div id="screen3" class="screen">
+        <h2>Buscar Check-out</h2>
+        <p>Digite o nome do cliente para buscar:</p>
+        
+        <input type="text" id="buscaNome" placeholder="Nome Completo">
+        
+        <button class="btn-primary" onclick="buscarCliente()">🔎 BUSCAR VEÍCULO</button>
+        <button class="btn-secondary" onclick="mudarTela('screen1')">↩️ VOLTAR</button>
+    </div>
 
-    btnRead.addEventListener('click', async () => {
-      if (!currentImage) return;
-      btnRead.disabled = true;
-      resultEl.textContent = "🔍 Processando imagem...";
+    <div id="screen4" class="screen">
+        <h2>Resumo e Pagamento</h2>
+        
+        <div class="receipt-box">
+            <p><strong>Nome:</strong> <span id="resumoNome"></span></p>
+            <p><strong>Placa:</strong> <span id="resumoPlaca"></span></p>
+            <hr style="margin: 10px 0;">
+            <p>Entrada: <span id="resumoEntrada"></span></p>
+            <p>Saída: <span id="resumoSaida"></span></p>
+            <p>Tempo Total: <span id="resumoTempo"></span></p>
+            <hr style="margin: 10px 0;">
+            <p>Horas Cobradas: <span id="resumoHorasCobradas"></span></p>
+            <p>Tarifa Horária: R$ 20,00</p>
+            <div class="price-tag" id="resumoValor">R$ 0,00</div>
+        </div>
 
-      const cvs = preprocessToCanvas(currentImage);
-      try {
-        const { data: ocr } = await Tesseract.recognize(cvs, 'eng', {
-          tessedit_pageseg_mode: '7',
-          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-        });
+        <button class="btn-danger" onclick="finalizarPagamento()">💵 FINALIZAR CHECK-OUT E PAGAR</button>
+    </div>
 
-        const raw = (ocr.text || '').toUpperCase();
-        const cleaned = raw.replace(/[^A-Z0-9]/g, '');
-        const { best, candidates } = normalizeAndValidate(cleaned);
+    <script>
+        // --- Variáveis Globais e Banco de Dados (LocalStorage) ---
+        let dbVeiculos = JSON.parse(localStorage.getItem('estacionamentoDB')) || [];
+        let veiculoAtual = null; 
+        const VALOR_POR_HORA = 20.00; 
+        const CARACTERES_PERMITIDOS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
-        if (best) {
-          resultEl.innerHTML = `✅ Placa detectada: <b class="ok">${best}</b>`;
-        } else {
-          resultEl.innerHTML = `❌ Falha na leitura.<br>OCR bruto: "${raw.trim()}"<br>Sugestões: ${candidates.join(', ')}`;
+        // --- Navegação ---
+        function mudarTela(telaId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(telaId).classList.add('active');
+            
+            if(telaId === 'screen1') iniciarCamera();
         }
-      } catch (err) {
-        resultEl.innerHTML = `❌ Erro no OCR: ${err.message}`;
-      } finally {
-        btnRead.disabled = false;
-      }
-    });
 
-    function preprocessToCanvas(img) {
-      const MAX_W = 1600;
-      const scale = Math.min(1, MAX_W / img.width);
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      const imgData = ctx.getImageData(0, 0, w, h);
-      const d = imgData.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const l = 0.2126*d[i] + 0.7152*d[i+1] + 0
+        // --- Lógica da Câmera ---
+        const video = document.getElementById('video');
+        const statusTexto = document.getElementById('ocr-status');
+
+        function iniciarCamera() {
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then(stream => {
+                    video.srcObject = stream;
+                    statusTexto.innerHTML = "Aponte para a placa e clique em Capturar";
+                })
+                .catch(err => {
+                    statusTexto.innerHTML = "❌ Erro: Câmera não acessível (HTTPS necessário no celular).";
+                });
+        }
+
+        // --- FUNÇÃO CENTRAL DE OCR (Recebe o objeto a ser processado) ---
+        function rodarOCR(source) {
+            statusTexto.innerHTML = "🔍 Processando imagem (lendo texto da placa)...";
+
+            Tesseract.recognize(
+                source,
+                'eng', 
+                { 
+                    tessedit_char_whitelist: CARACTERES_PERMITIDOS, 
+                    logger: m => console.log(m.status + ": " + Math.round(m.progress * 100) + "%") 
+                }
+            ).then(({ data: { text } }) => {
+                
+                // LIMPEZA E FILTRO INTELIGENTE (Regex)
+                let textoLimpo = text.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                // Regex para placas antigas (AAA0000) ou Mercosul (AAA0B00)
+                const regexPlaca = /([A-Z]{3}[0-9][0-9A-Z][0-9]{2})|([A-Z]{3}[0-9]{4})/;
+                const placaMatch = textoLimpo.match(regexPlaca);
+                
+                let placaFinal = "";
+
+                if (placaMatch) {
+                    placaFinal = placaMatch[0];
+                    alert(`✅ Placa Detectada: ${placaFinal}`);
+                } else {
+                    placaFinal = textoLimpo.substring(0, 7);
+                    if(placaFinal.length >= 5) {
+                        alert(`⚠️ Leitura Incerta: ${placaFinal}. Por favor, confira!`);
+                    } else {
+                        alert("❌ Falha na leitura da placa.");
+                        statusTexto.innerHTML = "Falha na leitura. Tente novamente.";
+                        return;
+                    }
+                }
+                prepararCheckIn(placaFinal);
+            });
+        }
+
+        // --- Processamento da Câmera (Com Binarização) ---
+        function capturarPlaca() {
+            if (!video.srcObject) {
+                alert("A câmera não foi iniciada. Use a simulação.");
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // TRATAMENTO DE IMAGEM (Binarização para Alto Contraste)
+            let imageObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let data = imageObj.data;
+            const threshold = 100;
+            
+            for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                const color = avg > threshold ? 255 : 0;
+                data[i] = color; data[i + 1] = color; data[i + 2] = color;
+            }
+            ctx.putImageData(imageObj, 0, 0);
+
+            rodarOCR(canvas); // Envia o canvas tratado para o OCR
+        }
+
+        // --- Processamento da Foto Carregada ---
+        function processarFotoCarregada() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert("Por favor, selecione uma foto para processar.");
+                return;
+            }
+
+            // O FileReader lê o conteúdo do arquivo
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    rodarOCR(img); // Envia o objeto Image diretamente para o OCR
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function simularLeitura() {
+            prepararCheckIn("LSN4I49");
+        }
+        
+        // --- Lógica de Check-in (TELA 2) ---
+        function prepararCheckIn(placa) {
+            document.getElementById('inputPlaca').value = placa;
+            document.getElementById('inputNome').value = "";
+            mudarTela('screen2');
+        }
+
+        function salvarCheckIn() {
+            const placa = document.getElementById('inputPlaca').value.toUpperCase().trim();
+            const nome = document.getElementById('inputNome').value.trim();
+            
+            if(!nome || !placa) { alert("Preencha Placa e Nome!"); return; }
+
+            const novoRegistro = {
+                id: Date.now(), 
+                placa: placa,
+                nome: nome,
+                entrada: new Date().toISOString(),
+                status: 'aberto'
+            };
+
+            dbVeiculos.push(novoRegistro);
+            localStorage.setItem('estacionamentoDB', JSON.stringify(dbVeiculos));
+            
+            alert(`✅ Check-in de ${nome} (${placa}) Salvo!`);
+            mudarTela('screen1');
+        }
+
+        // --- Lógica de Check-out (TELA 3 & 4) ---
+        function buscarCliente() {
+            const termo = document.getElementById('buscaNome').value.toLowerCase().trim();
+            
+            if(!termo) { alert("Digite o nome ou parte dele para buscar!"); return; }
+
+            const encontrado = dbVeiculos.find(v => 
+                v.status === 'aberto' && v.nome.toLowerCase().includes(termo)
+            );
+
+            if(encontrado) {
+                veiculoAtual = encontrado;
+                mostrarTelaPagamento(encontrado);
+            } else {
+                alert(`❌ Cliente "${termo}" não encontrado ou o check-out já foi realizado.`);
+            }
+        }
+
+        function mostrarTelaPagamento(veiculo) {
+            const entrada = new Date(veiculo.entrada);
+            const saida = new Date(); 
+            
+            const diferencaMs = saida - entrada;
+            const diferencaHoras = diferencaMs / (1000 * 60 * 60); 
+            
+            // REGRA DE NEGÓCIO: R$ 20,00 por hora NÃO FRACIONADA (Arredonda para cima, Mínimo 1h)
+            let horasCobradas = Math.ceil(diferencaHoras);
+            if (horasCobradas === 0 && diferencaMs > 0) horasCobradas = 1;
+            if (horasCobradas === 0 && diferencaMs === 0) horasCobradas = 1; 
+            
+            const totalPagar = horasCobradas * VALOR_POR_HORA;
+
+            const hrs = Math.floor(diferencaMs / 3600000);
+            const mins = Math.floor((diferencaMs % 3600000) / 60000);
+            
+            document.getElementById('resumoNome').innerText = veiculo.nome;
+            document.getElementById('resumoPlaca').innerText = veiculo.placa;
+            document.getElementById('resumoEntrada').innerText = entrada.toLocaleString('pt-BR');
+            document.getElementById('resumoSaida').innerText = saida.toLocaleString('pt-BR');
+            
+            document.getElementById('resumoTempo').innerText = `${hrs}h ${mins}m`;
+            document.getElementById('resumoHorasCobradas').innerText = `${horasCobradas} hora(s) cheia(s)`;
+            
+            document.getElementById('resumoValor').innerText = `R$ ${totalPagar.toFixed(2)}`;
+            
+            mudarTela('screen4');
+        }
+
+        function finalizarPagamento() {
+            veiculoAtual.status = 'pago';
+            veiculoAtual.saida = new Date().toISOString();
+            veiculoAtual.valorPago = document.getElementById('resumoValor').innerText;
+            
+            const index = dbVeiculos.findIndex(v => v.id === veiculoAtual.id);
+            dbVeiculos[index] = veiculoAtual;
+            localStorage.setItem('estacionamentoDB', JSON.stringify(dbVeiculos));
+            
+            alert("Pagamento registrado! Vaga liberada.");
+            mudarTela('screen1');
+        }
+        
+        iniciarCamera();
+
+    </script>
+</body>
+</html>
