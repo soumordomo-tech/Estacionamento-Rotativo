@@ -106,16 +106,24 @@
     <div id="screen1" class="screen active">
         <h2>🅿️ Estacionamento Rotativo</h2>
         <p>Inicie o Check-in capturando a placa.</p>
+        
         <div id="video-container">
             <video id="video" autoplay playsinline></video>
         </div>
         <p id="ocr-status" class="loading">Iniciando câmera...</p>
         
         <button class="btn-primary" onclick="capturarPlaca()">📸 CAPTURAR E LER PLACA</button>
-        <button class="btn-warning" onclick="simularLeitura()">⚠️ SIMULAR LEITURA (Teste)</button>
         
         <hr style="margin: 25px 0; border-top: 1px solid #eee;">
+        
+        <label for="fileInput" style="text-align: center; color: #1f3659; margin-bottom: 5px;">Ou carregue uma foto da placa:</label>
+        <input type="file" id="fileInput" accept="image/*" style="width: 100%; border: none; padding: 10px 0; margin-bottom: 10px; font-size: 16px;">
+        <button class="btn-secondary" onclick="processarFotoCarregada()">⬆️ PROCESSAR FOTO SALVA</button>
+        
+        <hr style="margin: 25px 0; border-top: 1px solid #eee;">
+
         <button class="btn-success" onclick="mudarTela('screen3')">✅ CHECK-OUT (Saída)</button>
+        <button class="btn-warning" onclick="simularLeitura()">⚠️ SIMULAR LEITURA (Teste)</button>
     </div>
 
     <div id="screen2" class="screen">
@@ -165,6 +173,7 @@
         let dbVeiculos = JSON.parse(localStorage.getItem('estacionamentoDB')) || [];
         let veiculoAtual = null; 
         const VALOR_POR_HORA = 20.00; 
+        const CARACTERES_PERMITIDOS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
         // --- Navegação ---
         function mudarTela(telaId) {
@@ -174,7 +183,7 @@
             if(telaId === 'screen1') iniciarCamera();
         }
 
-        // --- Lógica da Câmera e OCR (Final com Whitelist) ---
+        // --- Lógica da Câmera ---
         const video = document.getElementById('video');
         const statusTexto = document.getElementById('ocr-status');
 
@@ -193,6 +202,44 @@
                 });
         }
 
+        // --- FUNÇÃO CENTRAL DE OCR (Recebe o objeto a ser processado) ---
+        function rodarOCR(source) {
+            statusTexto.innerHTML = "🔍 Processando imagem (lendo texto da placa)...";
+
+            Tesseract.recognize(
+                source,
+                'eng', 
+                { 
+                    tessedit_char_whitelist: CARACTERES_PERMITIDOS, 
+                    logger: m => console.log(m.status + ": " + Math.round(m.progress * 100) + "%") 
+                }
+            ).then(({ data: { text } }) => {
+                
+                // LIMPEZA E FILTRO INTELIGENTE (Regex)
+                let textoLimpo = text.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+                const regexPlaca = /([A-Z]{3}[0-9][0-9A-Z][0-9]{2})|([A-Z]{3}[0-9]{4})/;
+                const placaMatch = textoLimpo.match(regexPlaca);
+                
+                let placaFinal = "";
+
+                if (placaMatch) {
+                    placaFinal = placaMatch[0];
+                    alert(`✅ Placa Detectada: ${placaFinal}`);
+                } else {
+                    placaFinal = textoLimpo.substring(0, 7);
+                    if(placaFinal.length >= 5) {
+                        alert(`⚠️ Leitura Incerta: ${placaFinal}. Por favor, confira!`);
+                    } else {
+                        alert("❌ Falha na leitura da placa.");
+                        statusTexto.innerHTML = "Falha na leitura. Tente novamente.";
+                        return;
+                    }
+                }
+                prepararCheckIn(placaFinal);
+            });
+        }
+
+        // --- Processamento da Câmera (Com Binarização) ---
         function capturarPlaca() {
             if (!video.srcObject) {
                 alert("A câmera não foi iniciada. Use a simulação.");
@@ -219,48 +266,35 @@
             }
             ctx.putImageData(imageObj, 0, 0);
 
-            statusTexto.innerHTML = "🔍 Processando imagem (lendo texto da placa)...";
-            
-            // Leitura com Tesseract
-            Tesseract.recognize(
-                canvas,
-                'eng', 
-                { 
-                    // Filtra para aceitar APENAS letras maiúsculas e números
-                    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 
-                    logger: m => console.log(m.status + ": " + Math.round(m.progress * 100) + "%") 
-                }
-            ).then(({ data: { text } }) => {
-                
-                // LIMPEZA E FILTRO INTELIGENTE (Regex)
-                let textoLimpo = text.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-                const regexPlaca = /([A-Z]{3}[0-9][0-9A-Z][0-9]{2})|([A-Z]{3}[0-9]{4})/;
-                const placaMatch = textoLimpo.match(regexPlaca);
-                
-                let placaFinal = "";
+            rodarOCR(canvas); // Envia o canvas tratado para o OCR
+        }
 
-                if (placaMatch) {
-                    placaFinal = placaMatch[0];
-                    alert(`✅ Placa Detectada: ${placaFinal}`);
-                } else {
-                    // Tentativa final de pegar os 7 primeiros caracteres
-                    placaFinal = textoLimpo.substring(0, 7);
-                    if(placaFinal.length >= 5) {
-                        alert(`⚠️ Leitura Incerta: ${placaFinal}. Por favor, confira!`);
-                    } else {
-                        alert("❌ Falha na leitura da placa.");
-                        statusTexto.innerHTML = "Falha na leitura. Tente novamente.";
-                        return;
-                    }
-                }
-                prepararCheckIn(placaFinal);
-            });
+        // --- Processamento da Foto Carregada ---
+        function processarFotoCarregada() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert("Por favor, selecione uma foto para processar.");
+                return;
+            }
+
+            // O FileReader lê o conteúdo do arquivo
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    rodarOCR(img); // Envia o objeto Image diretamente para o OCR
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
 
         function simularLeitura() {
             prepararCheckIn("LSN4I49");
         }
-
+        
         // --- Lógica de Check-in (TELA 2) ---
         function prepararCheckIn(placa) {
             document.getElementById('inputPlaca').value = placa;
